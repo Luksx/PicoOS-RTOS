@@ -27,7 +27,7 @@ _vectors: //Vector table VTOR
         .rept 26
         .word Default_Handler
         .endr
-    .size_vectors, . - _vectors
+    .size _vectors, . - _vectors
 
 .section .text.Reset_Handler, "ax", %progbits
 .thumb_func
@@ -56,7 +56,7 @@ Reset_Handler:
     adds r0, #4
     adds r2, #4
     b   .Lcopy_check
-.Lcopy_done
+.Lcopy_done:
     ldr r0, =_sbss
     ldr r1, =_ebss
     movs r2, #0
@@ -70,7 +70,7 @@ Reset_Handler:
     b .Lzero_check
 .Lzero_done:
     bl main
-.Lhang
+.Lhang:
     b   .Lhang
 
 .size Reset_Handler, . - Reset_Handler
