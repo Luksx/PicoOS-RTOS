@@ -42,50 +42,79 @@ Reset_Handler:
     ldr r1, =0xE000ED08 //VTOR
     str r0, [r1]
     // Copy data from flash to SRAM
-    ldr  r0, =_sdata
-    ldr  r1, =_edata
-    ldr  r2, =_sidata
+    ldr  r0, =_sdata // start SRAM
+    ldr  r1, =_edata //end SRAM
+    ldr  r2, =_sidata //load adress flash
 
-.Lcopy:
-    ldr r3, [r2]
-    str r3, [r0]
-    add r0, r0, #4
-    add r2, r2, #4
 .Lcopy_check:
     cmp r0, r1
-    bne .Lcopy
+    beq .Lcopy_done
 
+    ldr r3, [r2]
+    str r3, [r0]
 
+    adds r0, #4
+    adds r2, #4
+    b   .Lcopy_check
+.Lcopy_done
     ldr r0, =_sbss
     ldr r1, =_ebss
     movs r2, #0
-    b   .Lzero_check
-.Lzero:
-    str r2, [r0]
-    add r0, r0, #4
+
 .Lzero_check:
     cmp r0, r1
-    bne .Lzero
+    beq .Lzero_done
 
+    str r2, [r0]
+    adds r0, #4
+    b .Lzero_check
+.Lzero_done:
     bl main
-    b .
+.Lhang
+    b   .Lhang
 
-    .thumb_func
+.size Reset_Handler, . - Reset_Handler
+.section .text.Default_Handler, "ax", %progbits
+.thumb_func
+.global Default_Handler
+.type Default_Handler, %function
+
+Default_Handler:
+    b Default_Handler
+
+.size Default_Handler, . - Default_Handler
+
+
+.thumb_func
+.global NMI_Handler
+.type NMI_Handler, %function
 NMI_Handler:
-    b .
+    b    Default_Handler
 
-    .thumb_func
+
+.thumb_func
+.global HardFault_Handler
+.type HardFault_Handler, %function
 HardFault_Handler:
-    b .
+    b    Default_Handler
 
-    .thumb_func
+
+.thumb_func
+.global SVCall_Handler
+.type SVCall_Handler, %function
 SVCall_Handler:
-    b .
+    b    Default_Handler
 
-    .thumb_func
+
+.thumb_func
+.global PendSV_Handler
+.type PendSV_Handler, %function
 PendSV_Handler:
-    b .
+    b    Default_Handler
 
-    .thumb_func
+
+.thumb_func
+.global SysTick_Handler
+.type SysTick_Handler, %function
 SysTick_Handler:
-    b .   
+    b    Default_Handler
