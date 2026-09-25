@@ -1,128 +1,92 @@
 # PicoOS-RTOS bare-metal build
 
-PROJECT       := pico
-REPO_ROOT     := $(abspath .)
-BUILD_DIR     := $(REPO_ROOT)/build
-TARGET_PREFIX := $(BUILD_DIR)/$(PROJECT)
+PROJECT      := pico
+BUILD_DIR    := build
+TARGET       := $(BUILD_DIR)/$(PROJECT)
 
-CC            := arm-none-eabi-gcc
-OBJCOPY       := arm-none-eabi-objcopy
-SIZE          := arm-none-eabi-size
-OBJDUMP       := arm-none-eabi-objdump
-READELF       := arm-none-eabi-readelf
-GDB           := arm-none-eabi-gdb
-OPENOCD       := openocd
-PICOTOOL      := picotool
-PYTHON3       := python3
-CMAKE         := cmake
+CC           := arm-none-eabi-gcc
+OBJCOPY      := arm-none-eabi-objcopy
+SIZE         := arm-none-eabi-size
+OBJDUMP      := arm-none-eabi-objdump
+GDB          := arm-none-eabi-gdb
+OPENOCD      := openocd
+PICOTOOL     := picotool
 
-PICO_SDK_PATH ?= $(HOME)/pico-sdk
-BOOT2_SRC     := $(PICO_SDK_PATH)/src/rp2040/boot_stage2/boot2_w25q080.S
-BOOT2_CMAKE   := $(REPO_ROOT)/boot2/CMakeLists.txt
-BOOT2_BUILD   := $(BUILD_DIR)/boot2
-BOOT2_BIN     := $(BOOT2_BUILD)/boot2.bin
-BOOT2_OBJ     := $(BOOT2_BUILD)/boot2.bin.o
+CPU          := -mcpu=cortex-m0plus -mthumb
+LDSCRIPT     := rp2040.ld
 
-CPU           := -mcpu=cortex-m0plus -mthumb
-LDSCRIPT      := $(REPO_ROOT)/rp2040.ld
+SOURCES      := startup.S main.c
+OBJECTS      := $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(SOURCES))) \
+                $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(SOURCES)))
+DEPFILES     := $(OBJECTS:.o=.d)
 
-SOURCES       := startup.S main.c
-OBJECTS       := $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(SOURCES))) \
-                 $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(SOURCES)))
-DEPFILES      := $(OBJECTS:.o=.d)
+CPPFLAGS     := -I.
+CFLAGS       := $(CPU) \
+                -std=c11 \
+                -Wall \
+                -Wextra \
+                -Werror \
+                -Os \
+                -ffreestanding \
+                -fno-builtin \
+                -ffunction-sections \
+                -fdata-sections \
+                -MMD \
+                -MP
 
-TARGET_ELF    := $(TARGET_PREFIX).elf
-TARGET_BIN    := $(TARGET_PREFIX).bin
-TARGET_UF2    := $(TARGET_PREFIX).uf2
-TARGET_MAP    := $(TARGET_PREFIX).map
+ASFLAGS      := $(CPU) \
+                -ffreestanding \
+                -MMD \
+                -MP
 
-CPPFLAGS      := -I$(REPO_ROOT)
-CFLAGS        := $(CPU) \
-                 -std=c11 \
-                 -Wall \
-                 -Wextra \
-                 -Werror \
-                 -Os \
-                 -ffreestanding \
-                 -fno-builtin \
-                 -ffunction-sections \
-                 -fdata-sections \
-                 -MMD \
-                 -MP
-ASFLAGS       := $(CPU) \
-                 -ffreestanding \
-                 -MMD \
-                 -MP
-LDFLAGS       := $(CPU) \
-                 -T $(LDSCRIPT) \
-                 -nostdlib \
-                 -nostartfiles \
-                 -Wl,--gc-sections \
-                 -Wl,--build-id=none \
-                 -Wl,-Map=$(TARGET_MAP)
-LDLIBS        := -lgcc
+LDFLAGS      := $(CPU) \
+                -T $(LDSCRIPT) \
+                -nostdlib \
+                -nostartfiles \
+                -Wl,--gc-sections \
+                -Wl,--build-id=none \
+                -Wl,-Map=$(TARGET).map
 
-OPENOCD_CFG   := -f interface/cmsis-dap.cfg \
-                 -f target/rp2040.cfg
+LDLIBS       := -lgcc
 
-.PHONY: all elf bin uf2 flash debug disassemble symbols check verify-layout show-layout clean rebuild
+OPENOCD_CFG  := -f interface/cmsis-dap.cfg \
+                -f target/rp2040.cfg
 
-all: $(TARGET_ELF) $(TARGET_BIN) verify-layout
-	@$(SIZE) $(TARGET_ELF)
+.PHONY: all
+all: $(TARGET).elf $(TARGET).bin
+	@$(SIZE) $(TARGET).elf
 
-elf: $(TARGET_ELF)
+.PHONY: elf
+elf: $(TARGET).elf
 
-bin: $(TARGET_BIN)
+.PHONY: bin
+bin: $(TARGET).bin
 
-uf2: $(TARGET_UF2)
+.PHONY: uf2
+uf2: $(TARGET).uf2
 
+.PHONY: check
 check:
-	@command -v $(CC) >/dev/null || (echo "Error: $(CC) not found"; exit 1)
-	@command -v $(OBJCOPY) >/dev/null || (echo "Error: $(OBJCOPY) not found"; exit 1)
-	@command -v $(OBJDUMP) >/dev/null || (echo "Error: $(OBJDUMP) not found"; exit 1)
-	@command -v $(READELF) >/dev/null || (echo "Error: $(READELF) not found"; exit 1)
-	@command -v $(SIZE) >/dev/null || (echo "Error: $(SIZE) not found"; exit 1)
-	@command -v $(PICOTOOL) >/dev/null || (echo "Error: $(PICOTOOL) not found"; exit 1)
-	@command -v $(CMAKE) >/dev/null || (echo "Error: $(CMAKE) not found"; exit 1)
-	@command -v $(PYTHON3) >/dev/null || (echo "Error: $(PYTHON3) not found"; exit 1)
-	@[ -r "$(BOOT2_SRC)" ] || (echo "Error: BOOT2 source not found: $(BOOT2_SRC)"; exit 1)
-	@echo "Toolchain and SDK boot2 source found."
+	@command -v $(CC) >/dev/null || \
+		(echo "Error: $(CC) not found"; exit 1)
+	@command -v $(OBJCOPY) >/dev/null || \
+		(echo "Error: $(OBJCOPY) not found"; exit 1)
+	@command -v $(SIZE) >/dev/null || \
+		(echo "Error: $(SIZE) not found"; exit 1)
+	@echo "Toolchain found."
 
-$(BOOT2_BIN): $(BOOT2_CMAKE) $(BOOT2_SRC)
-	@mkdir -p $(BOOT2_BUILD)
-	@echo "CMAKE   $(BOOT2_BUILD)"
-	$(CMAKE) -S $(REPO_ROOT)/boot2 -B $(BOOT2_BUILD) \
-		-DPICO_SDK_PATH="$(PICO_SDK_PATH)" \
-		-DCMAKE_C_COMPILER="$(CC)" \
-		-DCMAKE_ASM_COMPILER="$(CC)" \
-		-DCMAKE_OBJCOPY="$(OBJCOPY)" \
-		-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
-	@echo "BUILD   $@"
-	$(CMAKE) --build $(BOOT2_BUILD) --target boot2_bin
-	@boot2_size="$$(wc -c < "$@")"; \
-	if [ "$$boot2_size" -ne 256 ]; then \
-		echo "Error: generated boot2 size is $$boot2_size bytes (expected 256)."; \
-		exit 1; \
-	fi
-
-$(BOOT2_OBJ): $(BOOT2_BIN)
-	@echo "OBJCOPY $@"
-	$(OBJCOPY) -I binary -O elf32-littlearm -B arm \
-		--rename-section .data=.boot2,alloc,load,readonly,data,contents \
-		$< $@
-
-$(TARGET_ELF): $(OBJECTS) $(BOOT2_OBJ) $(LDSCRIPT)
+$(TARGET).elf: $(OBJECTS) $(LDSCRIPT)
 	@mkdir -p $(dir $@)
 	@echo "LD      $@"
-	$(CC) $(LDFLAGS) -o $@ $(BOOT2_OBJ) $(OBJECTS) $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 
-$(TARGET_BIN): $(TARGET_ELF)
+$(TARGET).bin: $(TARGET).elf
 	@echo "OBJCOPY $@"
 	$(OBJCOPY) -O binary $< $@
 
-$(TARGET_UF2): $(TARGET_BIN)
+$(TARGET).uf2: $(TARGET).elf
 	@echo "UF2     $@"
-	$(PICOTOOL) uf2 convert $< $@ --family rp2040 --offset 0x10000000
+	$(PICOTOOL) uf2 convert $< $@
 
 $(BUILD_DIR)/%.o: %.S
 	@mkdir -p $(dir $@)
@@ -134,50 +98,37 @@ $(BUILD_DIR)/%.o: %.c
 	@echo "CC      $@"
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-show-layout: $(TARGET_ELF)
-	@echo "--- Section layout (.boot2/.text) ---"
-	@$(OBJDUMP) -h $(TARGET_ELF) | awk '$$2==".boot2" || $$2==".text"'
-	@echo "--- Key symbols ---"
-	@$(OBJDUMP) -t $(TARGET_ELF) | grep -E "(_vectors|Reset_Handler|main)$$" || true
-
-verify-layout: $(TARGET_ELF) $(TARGET_BIN) $(BOOT2_BIN)
-	@$(OBJDUMP) -h $(TARGET_ELF) | awk '\
-		BEGIN { boot2_ok=0; text_ok=0; } \
-		$$2==".boot2" { if ($$3=="00000100" && $$4=="10000000") boot2_ok=1; } \
-		$$2==".text"  { if ($$4=="10000100") text_ok=1; } \
-		END { \
-			if (!boot2_ok) { print "Error: .boot2 must be at 0x10000000 with size 0x100."; exit 1; } \
-			if (!text_ok)  { print "Error: .text must start at 0x10000100."; exit 1; } \
-		}'
-	@cmp -n 256 $(BOOT2_BIN) $(TARGET_BIN) >/dev/null || \
-		(echo "Error: application binary does not begin with generated boot2 image."; exit 1)
-	@echo "Layout verified: .boot2/.text addresses and boot2 binary prefix are correct."
-
-flash: $(TARGET_ELF)
+.PHONY: flash
+flash: $(TARGET).elf
 	$(OPENOCD) $(OPENOCD_CFG) \
-		-c "program $(TARGET_ELF) verify reset exit"
+		-c "program $(TARGET).elf verify reset exit"
 
-debug: $(TARGET_ELF)
+.PHONY: debug
+debug: $(TARGET).elf
 	@set -e; \
 	$(OPENOCD) $(OPENOCD_CFG) > $(BUILD_DIR)/openocd.log 2>&1 & \
 	OPENOCD_PID=$$!; \
 	trap 'kill $$OPENOCD_PID 2>/dev/null || true' EXIT INT TERM; \
 	sleep 2; \
-	$(GDB) $(TARGET_ELF) \
+	$(GDB) $(TARGET).elf \
 		-ex "target extended-remote :3333" \
 		-ex "monitor reset halt" \
 		-ex "break Reset_Handler" \
 		-ex "continue"
 
-disassemble: $(TARGET_ELF)
-	$(OBJDUMP) -d -S $(TARGET_ELF)
+.PHONY: disassemble
+disassemble: $(TARGET).elf
+	$(OBJDUMP) -d -S $(TARGET).elf
 
-symbols: $(TARGET_ELF)
-	$(OBJDUMP) -t $(TARGET_ELF)
+.PHONY: symbols
+symbols: $(TARGET).elf
+	$(OBJDUMP) -t $(TARGET).elf
 
+.PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
 
+.PHONY: rebuild
 rebuild: clean all
 
 -include $(DEPFILES)
