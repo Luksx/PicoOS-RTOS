@@ -1,16 +1,18 @@
 #include "include/kernel.h"
+#include <pico/time.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
 
-volatile task_t *current_task;
+task_t * volatile  current_task;
+task_t * volatile  next_task;
 
 void task_exit(void)
 {
     current_task->task_state = TASK_TERMINATED;
     printf("Task completed, shutting down\n");
-    while(1){};
+    while(1){}
 }
 
 

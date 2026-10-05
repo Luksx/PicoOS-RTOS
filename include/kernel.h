@@ -47,13 +47,16 @@ void task_init(
     uint32_t priority
 );
 
-extern volatile task_t *current_task;
+extern task_t* volatile  current_task;
+extern task_t* volatile  next_task;
 
 void load(task_entry_t entry, void *argument);
 
-void save(task_entry_t entry, void *argument);
+void save(uint32_t *sp);
 
-void context_switch(task_t old, task_t new);
+uint32_t *get_PSP();
+
+void context_switch(task_t *old, task_t *new);
 
 
 #endif
