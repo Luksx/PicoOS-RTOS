@@ -43,12 +43,10 @@ void task_init(
     size_t stack_size_bytes,
     void *argument,
     task_entry_t task_entry,
-    uint32_t id,
     uint32_t priority
 );
 
 extern task_t* volatile  current_task;
-extern task_t* volatile  next_task;
 
 void load(task_entry_t entry, void *argument);
 
@@ -57,6 +55,8 @@ void save(uint32_t *sp);
 uint32_t *get_PSP();
 
 void context_switch(task_t *old, task_t *new);
-
+void scheduler_init_task(task_t *task);
+void scheduler_select_next(void);
+void start_first_task(){};
 
 #endif

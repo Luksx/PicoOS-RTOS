@@ -6,7 +6,8 @@
 
 
 task_t * volatile  current_task;
-task_t * volatile  next_task;
+static uint32_t next_task_id = 0;
+
 
 void task_exit(void)
 {
@@ -24,7 +25,6 @@ void task_init(
     size_t stack_size_bytes,
     void *argument,
     task_entry_t task_entry,
-    uint32_t id,
     uint32_t priority
 )
 {
@@ -32,7 +32,7 @@ void task_init(
         return;
     }
     task->stack_size_bytes = stack_size_bytes;
-    task->id = id;
+    task->id = next_task_id++;
     task->priority = priority;
     task->task_entry = task_entry;
     task->stack_bottom = stack_bottom;
