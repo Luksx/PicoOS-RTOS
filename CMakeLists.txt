@@ -40,6 +40,7 @@ add_executable(bc-v0
         kernel/kernel.c
         kernel/content_switcher.S
         kernel/task.c
+        tasks/tasks.c
         )
 
 pico_set_program_name(bc-v0 "bc-v0")
