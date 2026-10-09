@@ -24,6 +24,7 @@ void task_exit(void);
 
 
 typedef struct task{
+    
     uint32_t *stack_pointer;
     uint32_t *stack_bottom;
     size_t stack_size_bytes;

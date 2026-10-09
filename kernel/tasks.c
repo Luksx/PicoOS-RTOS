@@ -30,7 +30,7 @@ void task_b(void *argument)
         printf("Uptime      : %lu ms\n", (unsigned long)uptime_ms);
         printf("Core        : %lu\n", (unsigned long)core);
         printf("CPU clock   : %lu kHz\n", (unsigned long)clock_khz);
-        sleep_ms(2000);
+        //task_yield()
     }   
     return;
 }
